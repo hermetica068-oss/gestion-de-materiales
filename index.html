@@ -1,0 +1,1635 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MatFlow — Gestión de Materiales</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+</head>
+<style>
+:root{
+  /* San José brand */
+  --sj-red:#B5232A;--sj-red-dark:#8f1a20;--sj-red-light:rgba(181,35,42,0.08);
+  --sj-red-glow:rgba(181,35,42,0.15);
+  /* App surfaces - tema claro */
+  --bg:#f4f5f7;--surface:#ffffff;--surface2:#f0f1f3;--surface3:#e5e7ea;
+  --border:#dde1e6;--border2:#c8cdd4;
+  /* Accents */
+  --accent:#B5232A;--ag:rgba(181,35,42,0.08);
+  --green:#1a9e62;--gb:rgba(26,158,98,0.1);
+  --red:#cc2a2a;--rb:rgba(204,42,42,0.1);
+  --yellow:#c47d00;--yb:rgba(196,125,0,0.1);
+  --purple:#7c4dcc;--pb:rgba(124,77,204,0.1);
+  --text:#1c2025;--muted:#5a6270;--dim:#9aa0aa;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+::-webkit-scrollbar{width:6px}::-webkit-scrollbar-track{background:var(--surface)}::-webkit-scrollbar-thumb{background:var(--border2);border-radius:3px}
+
+/* ── SCREENS ── */
+.screen{display:none;align-items:center;justify-content:center;min-height:100vh;padding:2rem;position:relative;overflow:hidden;}
+.screen.active{display:flex}
+
+/* Fondo login San José */
+#screen-login{
+  background:#f4f5f7;
+}
+#screen-login::before{
+  content:'';position:absolute;inset:0;
+  background:
+    radial-gradient(ellipse 70% 60% at 110% 50%, rgba(181,35,42,0.06) 0%, transparent 60%),
+    radial-gradient(ellipse 50% 80% at -10% 80%, rgba(181,35,42,0.04) 0%, transparent 55%);
+}
+/* Líneas diagonales decorativas */
+#screen-login::after{
+  content:'';position:absolute;inset:0;pointer-events:none;
+  background-image:repeating-linear-gradient(
+    -55deg,
+    transparent,transparent 40px,
+    rgba(181,35,42,0.02) 40px,rgba(181,35,42,0.02) 41px
+  );
+}
+
+/* ── AUTH BOX ── */
+.auth-box{
+  width:100%;max-width:460px;position:relative;z-index:1;
+  background:#ffffff;
+  border:1px solid var(--border);
+  border-radius:4px;
+  padding:0;
+  box-shadow:0 8px 40px rgba(0,0,0,.10), 0 2px 8px rgba(0,0,0,.06);
+  overflow:hidden;
+}
+
+/* Barra roja superior */
+.auth-box::before{
+  content:'';display:block;height:4px;
+  background:linear-gradient(90deg, var(--sj-red-dark), var(--sj-red), #e84040, var(--sj-red));
+  background-size:200% 100%;
+  animation:shimmer 3s linear infinite;
+}
+@keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
+
+.auth-inner{padding:2.4rem 2.6rem 2.6rem;}
+
+/* Logo área */
+.auth-logo-area{
+  display:flex;flex-direction:column;align-items:center;
+  margin-bottom:2rem;padding-bottom:1.6rem;
+  border-bottom:1px solid var(--border);
+  position:relative;
+}
+.auth-logo-img{
+  height:56px;width:auto;margin-bottom:.8rem;
+  filter:drop-shadow(0 2px 12px rgba(181,35,42,.3));
+}
+.auth-logo-sub{
+  font-family:'Syne',sans-serif;font-weight:600;font-size:.72rem;
+  letter-spacing:3px;text-transform:uppercase;color:var(--muted);
+}
+.auth-logo-sub span{color:var(--sj-red);}
+
+.auth-sub{color:var(--muted);font-size:.87rem;margin-bottom:1.8rem;display:none}
+.auth-logo{display:none}/* ocultar el logo de texto viejo */
+.auth-dot{display:none}
+
+.auth-tabs{display:flex;gap:0;margin-bottom:1.8rem;border-radius:4px;overflow:hidden;border:1px solid var(--border);}
+.auth-tab{
+  flex:1;padding:10px;border:none;
+  background:var(--surface2);color:var(--muted);
+  font-family:'DM Sans',sans-serif;font-size:.86rem;font-weight:500;
+  cursor:pointer;text-align:center;transition:all .2s;
+}
+.auth-tab:hover{color:var(--text);background:var(--surface3)}
+.auth-tab.active{background:var(--sj-red);color:#fff;font-weight:600;}
+
+.auth-field{display:flex;flex-direction:column;gap:5px;margin-bottom:.9rem}
+.auth-field label{font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--muted)}
+.auth-field input{
+  background:var(--surface2);border:1px solid var(--border);
+  border-radius:3px;padding:11px 14px;color:var(--text);
+  font-family:'DM Sans',sans-serif;font-size:.9rem;outline:none;transition:all .2s;
+}
+.auth-field input:focus{border-color:var(--sj-red);background:var(--surface3);box-shadow:0 0 0 3px var(--sj-red-light)}
+.auth-row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+
+.auth-msg{border-radius:3px;padding:10px 14px;font-size:.84rem;margin-bottom:.9rem;display:none}
+.auth-msg.err{background:var(--rb);border:1px solid rgba(255,94,94,.3);color:var(--red)}
+.auth-msg.ok{background:var(--gb);border:1px solid rgba(46,204,138,.3);color:var(--green)}
+.auth-msg.warn{background:var(--yb);border:1px solid rgba(245,166,35,.3);color:var(--yellow)}
+
+.btn-auth{
+  width:100%;padding:13px;border-radius:3px;border:none;
+  background:var(--sj-red);color:#fff;
+  font-family:'Syne',sans-serif;font-weight:700;font-size:.95rem;letter-spacing:.5px;
+  cursor:pointer;transition:all .2s;
+  box-shadow:0 4px 20px var(--sj-red-glow);
+  margin-top:.4rem;text-transform:uppercase;
+}
+.btn-auth:hover{background:var(--sj-red-dark);box-shadow:0 6px 28px var(--sj-red-glow);}
+.btn-auth:active{transform:translateY(1px)}
+
+.auth-hint{
+  margin-top:1.2rem;padding:10px 14px;
+  background:rgba(181,35,42,.07);
+  border:1px solid rgba(181,35,42,.15);
+  border-radius:3px;font-size:.77rem;color:var(--muted);line-height:1.7;
+}
+
+.role-selector{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:1.6rem}
+.role-card{
+  padding:1rem;border-radius:3px;
+  border:1px solid var(--border);
+  background:var(--surface2);cursor:pointer;text-align:center;transition:all .2s;
+}
+.role-card:hover{border-color:var(--border2);background:var(--surface3)}
+.role-card.selected{border-color:var(--sj-red);background:var(--sj-red-light);box-shadow:0 0 0 1px var(--sj-red)}
+.role-icon{font-size:1.7rem;margin-bottom:5px}
+.role-name{font-family:'Syne',sans-serif;font-weight:700;font-size:.88rem}
+.role-desc{font-size:.73rem;color:var(--muted);margin-top:2px}
+
+/* ── PENDING SCREEN ── */
+.pending-box{width:100%;max-width:420px;background:var(--surface);border:1px solid var(--border);border-radius:24px;padding:2.5rem;text-align:center;box-shadow:0 24px 80px rgba(0,0,0,.5)}
+.pending-icon{font-size:3rem;margin-bottom:1rem}
+.pending-title{font-family:'Syne',sans-serif;font-size:1.3rem;font-weight:700;margin-bottom:.5rem}
+.pending-sub{color:var(--muted);font-size:.88rem;line-height:1.6;margin-bottom:1.5rem}
+
+/* ── APP SHELL ── */
+#app{display:none}
+header{
+  background:var(--surface);
+  border-bottom:1px solid var(--border);
+  padding:0 2rem;
+  display:flex;align-items:center;justify-content:space-between;
+  height:64px;position:sticky;top:0;z-index:100;
+  box-shadow:0 1px 0 rgba(181,35,42,.15);
+}
+/* Línea roja inferior del header */
+header::after{
+  content:'';position:absolute;bottom:0;left:0;right:0;height:2px;
+  background:linear-gradient(90deg,var(--sj-red) 0%,transparent 60%);
+}
+.logo{display:flex;align-items:center;gap:12px}
+.logo-img{height:34px;width:auto;filter:brightness(1.05)}
+.logo-divider{width:1px;height:28px;background:var(--border2)}
+.logo-app{font-family:'Syne',sans-serif;font-weight:700;font-size:.82rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted)}
+.logo-dot{display:none}/* ocultar punto viejo */
+
+.header-right{display:flex;align-items:center;gap:10px}
+.role-pill{padding:5px 14px;border-radius:3px;font-size:.78rem;font-weight:600;letter-spacing:.3px}
+.role-pill.admin{background:rgba(181,35,42,.15);color:#e05a60;border:1px solid rgba(181,35,42,.3)}
+.role-pill.user{background:rgba(46,204,138,.1);color:var(--green);border:1px solid rgba(46,204,138,.25)}
+.nav{display:flex;gap:3px}
+.nav-btn{
+  padding:7px 15px;border-radius:3px;border:none;
+  background:transparent;color:var(--muted);
+  font-family:'DM Sans',sans-serif;font-size:.84rem;cursor:pointer;transition:all .2s;font-weight:500;
+}
+.nav-btn:hover{background:var(--surface2);color:var(--text)}
+.nav-btn.active{background:var(--sj-red);color:#fff;font-weight:600}
+.btn-logout{
+  padding:7px 13px;border-radius:3px;
+  border:1px solid var(--border);background:transparent;
+  color:var(--muted);font-family:'DM Sans',sans-serif;font-size:.83rem;cursor:pointer;transition:all .2s;
+}
+.btn-logout:hover{border-color:rgba(181,35,42,.5);color:#e05a60}
+
+/* ── LAYOUT ── */
+.container{max-width:1300px;margin:0 auto;padding:2rem}
+.page{display:none}.page.active{display:block}
+.page-title{font-family:'Syne',sans-serif;font-size:1.7rem;font-weight:700;margin-bottom:.3rem}
+.page-subtitle{color:var(--muted);font-size:.87rem;margin-bottom:2rem}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:1.5rem}
+.stats-bar{display:flex;gap:1rem;margin-bottom:2rem;flex-wrap:wrap}
+.stat-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:1rem 1.4rem;flex:1;min-width:110px}
+.stat-value{font-family:'Syne',sans-serif;font-size:1.6rem;font-weight:800;color:var(--accent)}
+.stat-label{font-size:.73rem;color:var(--muted);text-transform:uppercase;letter-spacing:.5px}
+
+/* ── CATALOG ── */
+.catalog-header{display:flex;gap:1rem;margin-bottom:1.5rem;align-items:center;flex-wrap:wrap}
+.search-input,.filter-select{background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:10px 15px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:.87rem;outline:none;transition:border-color .2s}
+.search-input{flex:1;min-width:170px}.search-input:focus,.filter-select:focus{border-color:var(--accent)}
+.materials-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(215px,1fr));gap:1rem}
+.material-card{background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:1.2rem;transition:all .2s;position:relative;overflow:hidden}
+.material-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,var(--accent),var(--green));opacity:0;transition:opacity .2s}
+.material-card:hover{border-color:var(--accent);transform:translateY(-2px)}.material-card:hover::before{opacity:1}
+.mat-cat{font-size:.69rem;text-transform:uppercase;letter-spacing:1px;color:var(--green);font-weight:600;margin-bottom:6px}
+.mat-name{font-family:'Syne',sans-serif;font-weight:600;font-size:.91rem;margin-bottom:3px}
+.mat-code{font-size:.74rem;color:var(--muted);margin-bottom:8px}
+.mat-unit{font-size:.79rem;color:var(--muted);margin-bottom:9px}
+.mat-actions{display:flex;gap:8px;align-items:center}
+.qty-input{width:56px;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:6px 7px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:.84rem;outline:none;text-align:center}
+.qty-input:focus{border-color:var(--accent)}
+.mat-in-cart{margin-top:7px;font-size:.75rem;color:var(--green)}
+
+/* ── BUTTONS ── */
+.btn{padding:8px 15px;border-radius:8px;border:none;font-family:'DM Sans',sans-serif;font-size:.84rem;font-weight:500;cursor:pointer;transition:all .2s}
+.btn-primary{background:var(--accent);color:#fff}.btn-primary:hover{background:#3a7bff}
+.btn-success{background:var(--green);color:#fff;font-weight:600}.btn-success:hover{background:#158a52}
+.btn-danger{background:var(--rb);color:var(--red);border:1px solid rgba(255,94,94,.25)}.btn-danger:hover{background:rgba(255,94,94,.2)}
+.btn-outline{background:transparent;color:var(--text);border:1px solid var(--border)}.btn-outline:hover{border-color:var(--accent);color:var(--accent)}
+.btn-purple{background:var(--pb);color:var(--purple);border:1px solid rgba(181,123,255,.25)}.btn-purple:hover{background:rgba(181,123,255,.2)}
+.btn-yellow{background:var(--yb);color:var(--yellow);border:1px solid rgba(255,179,71,.25)}.btn-yellow:hover{background:rgba(255,179,71,.2)}
+.btn-green{background:var(--gb);color:var(--green);border:1px solid rgba(0,229,160,.25)}.btn-green:hover{background:rgba(0,229,160,.2)}
+.btn-lg{padding:12px 22px;font-size:.91rem}.btn-sm{padding:5px 10px;font-size:.77rem}
+
+/* ── FORM ── */
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:1.1rem;margin-bottom:1.4rem}
+@media(max-width:600px){.form-grid{grid-template-columns:1fr}}
+.form-group{display:flex;flex-direction:column;gap:5px}.form-group.full{grid-column:1/-1}
+label{font-size:.76rem;font-weight:600;text-transform:uppercase;letter-spacing:.5px;color:var(--muted)}
+input[type="text"],input[type="date"],input[type="number"],input[type="password"],textarea,select{background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:10px 13px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:.87rem;outline:none;transition:border-color .2s;width:100%}
+input:focus,textarea:focus,select:focus{border-color:var(--accent)}
+textarea{resize:vertical;min-height:74px}
+
+/* ── TABLES ── */
+.section-label{font-family:'Syne',sans-serif;font-size:.94rem;font-weight:700;margin-bottom:1rem;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.badge{background:var(--accent);color:#fff;font-size:.69rem;font-weight:600;padding:2px 9px;border-radius:99px;font-family:'DM Sans',sans-serif}
+.badge-green{background:var(--green);color:#fff}.badge-purple{background:var(--purple);color:#fff}.badge-red{background:var(--red);color:#fff}.badge-yellow{background:var(--yellow);color:#fff}
+table{width:100%;border-collapse:collapse;font-size:.86rem}
+thead th{text-align:left;padding:9px 11px;font-size:.71rem;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);font-weight:600;border-bottom:1px solid var(--border)}
+tbody tr{border-bottom:1px solid rgba(42,49,71,.4);transition:background .15s}
+tbody tr:hover{background:rgba(79,142,255,.04)}
+tbody td{padding:10px 11px;vertical-align:middle}
+.tag{display:inline-block;background:var(--ag);color:var(--accent);border:1px solid rgba(79,142,255,.2);border-radius:6px;font-size:.72rem;padding:2px 8px}
+.empty-state{text-align:center;padding:2.5rem;color:var(--muted)}
+.empty-icon{font-size:2.2rem;margin-bottom:.5rem}
+
+/* ── STATUS ── */
+.status{padding:3px 10px;border-radius:99px;font-size:.72rem;font-weight:600;display:inline-block}
+.status-pending{background:var(--yb);color:var(--yellow)}
+.status-approved{background:var(--ag);color:var(--accent)}
+.status-completed{background:var(--gb);color:var(--green)}
+.status-rejected{background:var(--rb);color:var(--red)}
+.status-active{background:var(--gb);color:var(--green)}
+.status-inactive{background:var(--rb);color:var(--red)}
+.status-waiting{background:var(--yb);color:var(--yellow)}
+
+/* ── HISTORY ITEM ── */
+.history-item{background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:1.1rem 1.4rem;margin-bottom:.75rem;display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap;transition:border-color .2s}
+.history-item:hover{border-color:var(--border2)}
+.history-meta{flex:1;min-width:190px}
+.history-id{font-family:'Syne',sans-serif;font-weight:700;font-size:.91rem}
+.history-info{font-size:.79rem;color:var(--muted);margin-top:3px;line-height:1.5}
+.history-actions{display:flex;gap:7px;flex-wrap:wrap;align-items:center}
+.divider{height:1px;background:var(--border);margin:1.4rem 0}
+
+/* ── MODAL ── */
+.modal-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.65);backdrop-filter:blur(5px);z-index:200;align-items:center;justify-content:center;padding:1rem}
+.modal-bg.open{display:flex}
+.modal{background:var(--surface);border:1px solid var(--border);border-radius:20px;padding:2rem;max-width:640px;width:100%;max-height:87vh;overflow-y:auto}
+.modal-title{font-family:'Syne',sans-serif;font-size:1.12rem;font-weight:700;margin-bottom:1.4rem}
+.modal-footer{display:flex;gap:9px;justify-content:flex-end;margin-top:1.4rem;flex-wrap:wrap}
+
+/* ── TOAST ── */
+.toast{position:fixed;bottom:2rem;right:2rem;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px 17px;font-size:.85rem;box-shadow:0 8px 32px rgba(0,0,0,.4);z-index:500;transform:translateY(80px);opacity:0;transition:all .3s;max-width:290px}
+.toast.show{transform:translateY(0);opacity:1}
+.toast.t-ok{border-color:var(--green)}.toast.t-err{border-color:var(--red)}.toast.t-warn{border-color:var(--yellow)}
+.toast-title{font-weight:600;margin-bottom:2px}
+.t-ok .toast-title{color:var(--green)}.t-err .toast-title{color:var(--red)}.t-warn .toast-title{color:var(--yellow)}
+
+/* ── ADMIN TABS ── */
+.admin-tabs{display:flex;gap:5px;margin-bottom:1.4rem;flex-wrap:wrap}
+.tab-btn{padding:7px 16px;border-radius:8px;border:1px solid var(--border);background:var(--surface2);color:var(--muted);font-family:'DM Sans',sans-serif;font-size:.84rem;font-weight:500;cursor:pointer;transition:all .2s}
+.tab-btn:hover{color:var(--text);border-color:var(--border2)}
+.tab-btn.active{background:var(--pb);color:var(--purple);border-color:rgba(181,123,255,.3)}
+.admin-tab{display:none}.admin-tab.active{display:block}
+
+/* ── USER ADMIN ROW ── */
+.user-row{display:grid;grid-template-columns:1fr 1fr 100px 90px auto;gap:10px;align-items:center;padding:10px 12px;border-radius:10px;border:1px solid var(--border);background:var(--surface2);margin-bottom:6px;font-size:.84rem}
+.user-row.header-row{background:transparent;border-color:transparent;font-size:.71rem;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;padding-bottom:3px}
+@media(max-width:700px){.user-row{grid-template-columns:1fr 1fr}}
+
+/* ── MAT ADMIN ROW ── */
+.mat-row{display:grid;grid-template-columns:85px 1fr 140px 95px 105px auto auto;gap:9px;align-items:center;padding:9px 11px;border-radius:10px;border:1px solid var(--border);background:var(--surface2);margin-bottom:5px;font-size:.84rem}
+.mat-row.header-row{background:transparent;border-color:transparent;font-size:.71rem;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;padding-bottom:3px}
+@media(max-width:800px){.mat-row{grid-template-columns:1fr 1fr}}
+
+/* ── PENDING NOTIFICATION DOT ── */
+.notif-dot{display:inline-block;width:7px;height:7px;background:var(--red);border-radius:50%;margin-left:5px;vertical-align:middle;animation:pulse 1.5s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+@keyframes spin{to{transform:rotate(360deg)}}
+.cat-tabs{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:1.4rem}
+.cat-tab{padding:7px 14px;border-radius:3px;border:1px solid var(--border);background:var(--surface2);color:var(--muted);font-family:'Syne',sans-serif;font-size:.76rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em;cursor:pointer;transition:all .18s;white-space:nowrap}
+.cat-tab:hover{border-color:var(--sj-red);color:var(--text)}
+.cat-tab.active{background:var(--sj-red);border-color:var(--sj-red);color:#fff}
+
+/* ══════════════════════════════════════
+   RESPONSIVE — MOBILE (≤ 768px)
+══════════════════════════════════════ */
+@media (max-width: 768px) {
+
+  /* --- Auth box --- */
+  .screen { padding: 1rem; }
+  .auth-box { max-width: 100%; border-radius: 3px; }
+  .auth-inner { padding: 1.6rem 1.4rem 1.8rem; }
+  .auth-tabs { padding: 0 1.4rem; }
+  .auth-tab { padding: 11px 0; font-size: .82rem; }
+  .role-selector { grid-template-columns: 1fr 1fr; gap: 8px; }
+  .role-card { padding: .75rem .5rem; }
+  .role-icon { font-size: 1.4rem; }
+  .role-name { font-size: .8rem; }
+  .role-desc { font-size: .68rem; }
+
+  /* --- Header --- */
+  header { padding: 0 1rem; height: 56px; }
+  .logo-img { height: 26px; }
+  .logo-app { font-size: .7rem; letter-spacing: 1px; }
+  .logo-divider { height: 22px; }
+  .role-pill { display: none; } /* ocultar en móvil, ahorra espacio */
+  .nav { gap: 1px; }
+  .nav-btn { padding: 6px 9px; font-size: .75rem; }
+  .btn-logout { padding: 6px 9px; font-size: .75rem; }
+
+  /* --- Layout --- */
+  .container { padding: 1rem; }
+  .page-title { font-size: 1.25rem; }
+  .page-subtitle { font-size: .81rem; margin-bottom: 1.2rem; }
+  .card { padding: 1rem; border-radius: 10px; }
+  .stats-bar { gap: .6rem; margin-bottom: 1.2rem; }
+  .stat-card { padding: .75rem 1rem; border-radius: 8px; min-width: 80px; }
+  .stat-value { font-size: 1.25rem; }
+  .stat-label { font-size: .67rem; }
+
+  /* --- Catalog tabs --- */
+  .cat-tabs { gap: 5px; }
+  .cat-tab { padding: 6px 10px; font-size: .68rem; letter-spacing: 0; }
+
+  /* --- Catalog header & grid --- */
+  .catalog-header { gap: .6rem; }
+  .search-input { font-size: .83rem; padding: 9px 11px; }
+  .materials-grid { grid-template-columns: 1fr 1fr; gap: .7rem; }
+  .material-card { padding: .9rem; border-radius: 8px; }
+  .mat-name { font-size: .83rem; }
+  .mat-code { font-size: .7rem; }
+  .mat-unit { font-size: .74rem; }
+  .qty-input { width: 46px; font-size: .8rem; }
+  .btn { font-size: .78rem; padding: 7px 11px; }
+  .btn-lg { padding: 10px 16px; font-size: .85rem; }
+  .btn-sm { padding: 4px 8px; font-size: .72rem; }
+
+  /* --- Forms --- */
+  .form-grid { grid-template-columns: 1fr; gap: .8rem; }
+  input[type="text"],input[type="date"],input[type="number"],
+  input[type="password"],textarea,select { font-size: .84rem; padding: 9px 11px; border-radius: 8px; }
+
+  /* --- Tables → stack rows --- */
+  table thead { display: none; }
+  table tbody tr { display: flex; flex-direction: column; padding: .6rem .8rem; border-radius: 8px; margin-bottom: .5rem; background: var(--surface2); border: 1px solid var(--border); }
+  table tbody td { padding: 3px 0; border: none; font-size: .82rem; }
+  table tbody td::before { content: attr(data-label); font-size: .68rem; color: var(--muted); text-transform: uppercase; letter-spacing: .4px; display: block; margin-bottom: 1px; }
+
+  /* --- User rows --- */
+  .user-row { grid-template-columns: 1fr 1fr; gap: 7px; font-size: .79rem; }
+  .user-row.header-row { display: none; }
+
+  /* --- Mat rows --- */
+  .mat-row { grid-template-columns: 1fr 1fr; gap: 7px; font-size: .79rem; }
+  .mat-row.header-row { display: none; }
+
+  /* --- History items --- */
+  .history-item { flex-direction: column; align-items: flex-start; gap: .6rem; padding: .9rem 1rem; }
+  .history-actions { width: 100%; }
+  .history-actions .btn { flex: 1; text-align: center; }
+
+  /* --- Admin tabs --- */
+  .admin-tabs { gap: 4px; }
+  .tab-btn { padding: 6px 12px; font-size: .78rem; }
+
+  /* --- Modal --- */
+  .modal { padding: 1.4rem; border-radius: 12px; max-height: 92vh; }
+  .modal-footer { gap: 6px; }
+  .modal-footer .btn { flex: 1; }
+
+  /* --- Toast --- */
+  .toast { bottom: 1rem; right: 1rem; left: 1rem; max-width: 100%; font-size: .82rem; }
+
+  /* --- Section label --- */
+  .section-label { font-size: .85rem; }
+}
+
+/* ══════════════════════════════════════
+   RESPONSIVE — SMALL MOBILE (≤ 420px)
+══════════════════════════════════════ */
+@media (max-width: 420px) {
+  .materials-grid { grid-template-columns: 1fr; }
+  .cat-tab { padding: 5px 8px; font-size: .63rem; }
+  .nav-btn { padding: 5px 7px; font-size: .71rem; }
+  header { height: 52px; }
+  .page-title { font-size: 1.1rem; }
+  .role-selector { grid-template-columns: 1fr 1fr; }
+}
+
+/* ══════════════════════════════════════
+   RESPONSIVE — TABLET (769px – 1024px)
+══════════════════════════════════════ */
+@media (min-width: 769px) and (max-width: 1024px) {
+  .container { padding: 1.4rem; }
+  .materials-grid { grid-template-columns: repeat(auto-fill, minmax(185px, 1fr)); }
+  .mat-row { grid-template-columns: 80px 1fr 120px 85px 95px auto auto; }
+  .user-row { grid-template-columns: 1fr 1fr 90px 80px auto; }
+  header { padding: 0 1.4rem; }
+}
+
+</style>
+  <!-- Firebase compat SDK -->
+
+<body>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
+<!-- ══════════ SCREEN: LOADING ══════════ -->
+<div id="screen-loading" class="screen">
+  <div style="text-align:center;z-index:1">
+    <div style="width:56px;height:56px;border:3px solid var(--border2);border-top-color:var(--sj-red);border-radius:50%;animation:spin 0.8s linear infinite;margin:0 auto 1.2rem"></div>
+    <div style="font-family:'Syne',sans-serif;font-weight:700;font-size:1rem;color:var(--muted)">Conectando con la base de datos...</div>
+  </div>
+</div>
+
+<!-- ══════════ SCREEN: LOGIN ══════════ -->
+<div id="screen-login" class="screen active">
+  <div class="auth-box">
+
+    <div class="auth-tabs">
+      <div class="auth-tab active" id="tab-login" onclick="switchAuthTab('login')">Iniciar sesión</div>
+      <div class="auth-tab" id="tab-register" onclick="switchAuthTab('register')">Registrarse</div>
+    </div>
+
+    <div class="auth-inner">
+
+      <!-- LOGIN FORM -->
+      <div id="form-login">
+        <div class="role-selector">
+          <div class="role-card selected" id="role-user-card" onclick="selectRole('usuario')">
+            <div class="role-icon">👷</div>
+            <div class="role-name">Usuario</div>
+            <div class="role-desc">Solicitar materiales</div>
+          </div>
+          <div class="role-card" id="role-admin-card" onclick="selectRole('admin')">
+            <div class="role-icon">⚙️</div>
+            <div class="role-name">Administrador</div>
+            <div class="role-desc">Gestionar sistema</div>
+          </div>
+        </div>
+        <!-- Campo para ADMIN -->
+        <div class="auth-field" id="field-admin-user" style="display:none">
+          <label>Usuario admin</label>
+          <input type="text" id="login-user-admin" placeholder="admin" onkeydown="if(event.key==='Enter')doLogin()">
+        </div>
+        <!-- Campo para USUARIOS (desplegable) -->
+        <div class="auth-field" id="field-select-user">
+          <label>Usuario</label>
+          <select id="login-user" style="background:var(--surface2);border:1px solid var(--border);border-radius:3px;padding:11px 14px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:.9rem;outline:none;transition:all .2s;width:100%;cursor:pointer" onkeydown="if(event.key==='Enter')doLogin()">
+            <option value="">— Seleccioná un usuario —</option>
+          </select>
+        </div>
+        <div class="auth-field">
+          <label>Contraseña</label>
+          <input type="password" id="login-pass" placeholder="••••••••" onkeydown="if(event.key==='Enter')doLogin()">
+        </div>
+        <div class="auth-msg err" id="login-error"></div>
+        <button class="btn-auth" onclick="doLogin()">Ingresar →</button>
+      </div>
+
+      <!-- REGISTER FORM -->
+      <div id="form-register" style="display:none">
+        <div class="auth-row">
+          <div class="auth-field">
+            <label>Nombre *</label>
+            <input type="text" id="reg-nombre" placeholder="Juan">
+          </div>
+          <div class="auth-field">
+            <label>Apellido *</label>
+            <input type="text" id="reg-apellido" placeholder="Pérez">
+          </div>
+        </div>
+        <div class="auth-field">
+          <label>Usuario (generado automáticamente)</label>
+          <input type="text" id="reg-username" placeholder="nombre.apellido" readonly style="opacity:.6;cursor:not-allowed">
+        </div>
+        <div class="auth-field">
+          <label>Contraseña *</label>
+          <input type="password" id="reg-pass" placeholder="Mínimo 6 caracteres">
+        </div>
+        <div class="auth-field">
+          <label>Confirmar contraseña *</label>
+          <input type="password" id="reg-pass2" placeholder="Repetí la contraseña">
+        </div>
+        <div class="auth-field">
+          <label>Área / Sector</label>
+          <input type="text" id="reg-area" placeholder="Ej: Mantenimiento">
+        </div>
+        <div class="auth-msg err" id="reg-error"></div>
+        <div class="auth-msg ok" id="reg-ok"></div>
+        <button class="btn-auth" onclick="doRegister()">Solicitar acceso →</button>
+      </div>
+
+    </div><!-- /auth-inner -->
+  </div>
+</div>
+
+<!-- ══════════ SCREEN: PENDING APPROVAL ══════════ -->
+<div id="screen-pending" class="screen">
+  <div class="pending-box">
+    <div class="pending-icon">⏳</div>
+    <div class="pending-title">Solicitud enviada</div>
+    <div class="pending-sub">Tu cuenta está pendiente de aprobación por el administrador.<br>Una vez aprobada podrás ingresar al sistema.</div>
+    <button class="btn btn-outline" onclick="showScreen('screen-login')">← Volver al login</button>
+  </div>
+</div>
+
+<!-- ══════════ APP ══════════ -->
+<div id="app">
+  <header>
+    <div class="logo">
+      <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <circle cx="16" cy="16" r="14" fill="#B5232A"/>
+        <circle cx="16" cy="16" r="9" fill="#fff"/>
+        <circle cx="16" cy="16" r="5" fill="#B5232A"/>
+        <polygon points="16,2 17.5,8 14.5,8" fill="#B5232A"/>
+        <polygon points="16,30 17.5,24 14.5,24" fill="#B5232A"/>
+        <polygon points="2,16 8,17.5 8,14.5" fill="#B5232A"/>
+        <polygon points="30,16 24,17.5 24,14.5" fill="#B5232A"/>
+      </svg>
+      <div class="logo-divider"></div>
+      <span class="logo-app">MatFlow</span>
+    </div>
+    <nav class="nav" id="main-nav"></nav>
+    <div class="header-right">
+      <div class="role-pill" id="role-pill"></div>
+      <button class="btn-logout" onclick="logout()">Salir</button>
+    </div>
+  </header>
+  <div class="container">
+
+    <!-- ── USER: Catálogo ── -->
+    <div id="page-catalogo" class="page">
+      <div class="page-title">Catálogo de Materiales</div>
+      <div class="page-subtitle">Seleccioná materiales y cantidades para tu pedido</div>
+      <div class="stats-bar">
+        <div class="stat-card"><div class="stat-value" id="stat-total-mat">0</div><div class="stat-label">Materiales</div></div>
+        <div class="stat-card"><div class="stat-value" id="stat-carrito">0</div><div class="stat-label">En carrito</div></div>
+      </div>
+      <div class="card">
+        <div class="cat-tabs" id="cat-tabs">
+          <button class="cat-tab active" onclick="selectCatTab(this,'Electricidad 1er año')">Electricidad 1er año</button><button class="cat-tab" onclick="selectCatTab(this,'Electricidad 2do año')">Electricidad 2do año</button><button class="cat-tab" onclick="selectCatTab(this,'Electricidad 3er año')">Electricidad 3er año</button><button class="cat-tab" onclick="selectCatTab(this,'Soldadura 2do año')">Soldadura 2do año</button><button class="cat-tab" onclick="selectCatTab(this,'Soldadura 3er año')">Soldadura 3er año</button><button class="cat-tab" onclick="selectCatTab(this,'Torneria 2do año')">Torneria 2do año</button><button class="cat-tab" onclick="selectCatTab(this,'Torneria 3er año')">Torneria 3er año</button><button class="cat-tab" onclick="selectCatTab(this,'Corte y plegado 2do año')">Corte y plegado 2do año</button>
+        </div>
+        <div class="catalog-header" style="margin-bottom:1rem">
+          <input class="search-input" type="text" placeholder="🔍 Buscar por nombre o código..." oninput="filterCatalog()" id="search-input">
+          <button class="btn btn-primary" onclick="showPage('solicitud')">🛒 Ir al carrito <span id="cart-count-badge" class="badge" style="display:none">0</span></button>
+        </div>
+        <div class="materials-grid" id="materials-grid"></div>
+      </div>
+    </div>
+
+    <!-- ── USER: Solicitud ── -->
+    <div id="page-solicitud" class="page">
+      <div class="page-title">Nueva Solicitud</div>
+      <div class="page-subtitle">Revisá tu pedido y completá los datos antes de enviarlo</div>
+      <div class="card" style="margin-bottom:1.4rem">
+        <div class="section-label">👤 Datos del Solicitante</div>
+        <div class="form-grid">
+          <div class="form-group"><label>Nombre *</label><input type="text" id="sol-nombre"></div>
+          <div class="form-group"><label>Apellido *</label><input type="text" id="sol-apellido"></div>
+          <div class="form-group"><label>Área / Sector</label><input type="text" id="sol-area"></div>
+          <div class="form-group"><label>Fecha requerida</label><input type="date" id="sol-fecha"></div>
+          <div class="form-group full"><label>Observaciones</label><textarea id="sol-obs" placeholder="Comentarios adicionales..."></textarea></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="section-label">📋 Materiales del catálogo <span class="badge badge-green" id="cart-items-count">0 ítems</span></div>
+        <div id="cart-table-container"><div class="empty-state"><div class="empty-icon">🧺</div><div>No hay materiales en el carrito.</div></div></div>
+        <div class="divider"></div>
+        <div style="display:flex;gap:9px;justify-content:flex-end;flex-wrap:wrap">
+          <button class="btn btn-outline btn-lg" onclick="showPage('catalogo')">← Catálogo</button>
+          <button class="btn btn-danger btn-lg" onclick="clearCart()">🗑 Vaciar</button>
+        </div>
+      </div>
+
+      <!-- MATERIALES FUERA DE CATÁLOGO -->
+      <div class="card" style="margin-top:1.4rem">
+        <div class="section-label">🔎 Materiales fuera de catálogo
+          <span style="font-size:.76rem;font-weight:400;color:var(--muted)">Agregá ítems que no están en el catálogo</span>
+        </div>
+
+        <!-- Formulario para agregar ítem libre -->
+        <div style="background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:1.1rem;margin-bottom:1rem">
+          <div class="form-grid" style="margin-bottom:.8rem">
+            <div class="form-group"><label>Descripción *</label><input type="text" id="extra-desc" placeholder="Nombre o descripción del material"></div>
+            <div class="form-group"><label>Cantidad *</label><input type="number" id="extra-qty" min="1" placeholder="1"></div>
+            <div class="form-group"><label>Unidad</label><input type="text" id="extra-unit" placeholder="Ej: Unidad, Metro, kg"></div>
+            <div class="form-group"><label>Referencia / Marca</label><input type="text" id="extra-ref" placeholder="Opcional"></div>
+            <div class="form-group full"><label>Observación del ítem</label><input type="text" id="extra-obs" placeholder="Detalles adicionales, especificaciones..."></div>
+          </div>
+          <button class="btn btn-purple" onclick="addExtraItem()">➕ Agregar ítem</button>
+        </div>
+
+        <!-- Lista de ítems libres -->
+        <div id="extra-items-container"><div class="empty-state" style="padding:1.2rem"><div class="empty-icon" style="font-size:1.5rem">📝</div><div>No hay ítems extra agregados.</div></div></div>
+
+        <div class="divider"></div>
+        <div style="display:flex;gap:9px;justify-content:flex-end;flex-wrap:wrap">
+          <button class="btn btn-success btn-lg" onclick="submitOrder()">✅ Generar pedido y exportar Excel</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── USER: Mis Pedidos ── -->
+    <div id="page-mis-pedidos" class="page">
+      <div class="page-title">Mis Pedidos</div>
+      <div class="page-subtitle">Seguimiento de tus solicitudes</div>
+      <div id="mis-pedidos-container"><div class="empty-state card"><div class="empty-icon">📭</div><div>Todavía no realizaste pedidos.</div></div></div>
+    </div>
+
+    <!-- ── ADMIN: Panel ── -->
+    <div id="page-admin" class="page">
+      <div class="page-title">Panel de Administración</div>
+      <div class="page-subtitle">Pedidos, usuarios y catálogo de materiales</div>
+      <div class="stats-bar">
+        <div class="stat-card"><div class="stat-value" id="adm-total">0</div><div class="stat-label">Pedidos</div></div>
+        <div class="stat-card"><div class="stat-value" id="adm-pending" style="color:var(--yellow)">0</div><div class="stat-label">Pendientes</div></div>
+        <div class="stat-card"><div class="stat-value" id="adm-approved" style="color:var(--accent)">0</div><div class="stat-label">Aprobados</div></div>
+        <div class="stat-card"><div class="stat-value" id="adm-completed" style="color:var(--green)">0</div><div class="stat-label">Completados</div></div>
+        <div class="stat-card"><div class="stat-value" id="adm-users" style="color:var(--purple)">0</div><div class="stat-label">Usuarios</div></div>
+        <div class="stat-card"><div class="stat-value" id="adm-mats">0</div><div class="stat-label">Materiales</div></div>
+      </div>
+      <div class="admin-tabs">
+        <button class="tab-btn active" onclick="showAdminTab('pedidos',this)">📦 Pedidos</button>
+        <button class="tab-btn" id="tab-btn-usuarios" onclick="showAdminTab('usuarios',this)">👥 Usuarios</button>
+        <button class="tab-btn" onclick="showAdminTab('materiales',this)">🔧 Materiales</button>
+      </div>
+
+      <!-- Tab Pedidos -->
+      <div id="admin-tab-pedidos" class="admin-tab active">
+        <div class="card">
+          <div style="display:flex;gap:9px;margin-bottom:1.1rem;flex-wrap:wrap;align-items:center">
+            <input class="search-input" style="flex:1;min-width:150px" type="text" placeholder="🔍 Buscar..." oninput="filterOrders()" id="admin-search-orders">
+            <select class="filter-select" onchange="filterOrders()" id="admin-filter-status">
+              <option value="">Todos los estados</option>
+              <option>Pendiente</option><option>Aprobado</option><option>Completado</option><option>Rechazado</option>
+            </select>
+            <button class="btn btn-success" onclick="exportAllOrders()">📥 Exportar todos</button>
+          </div>
+          <div id="admin-orders-list"><div class="empty-state"><div class="empty-icon">📭</div><div>No hay pedidos.</div></div></div>
+        </div>
+      </div>
+
+      <!-- Tab Usuarios -->
+      <div id="admin-tab-usuarios" class="admin-tab">
+        <!-- Pendientes de aprobación -->
+        <div class="card" style="margin-bottom:1.4rem" id="pending-users-card">
+          <div class="section-label">⏳ Solicitudes pendientes <span class="badge badge-red" id="pending-count-badge">0</span></div>
+          <div id="pending-users-list"><div class="empty-state" style="padding:1.5rem"><div>No hay solicitudes pendientes.</div></div></div>
+        </div>
+        <!-- Usuarios activos -->
+        <div class="card">
+          <div class="section-label">👥 Usuarios registrados <span class="badge badge-purple" id="users-count-badge">0</span></div>
+          <div style="display:flex;gap:9px;margin-bottom:1rem;flex-wrap:wrap">
+            <input class="search-input" type="text" placeholder="🔍 Buscar usuario..." oninput="filterUsers()" id="admin-user-search">
+            <select class="filter-select" onchange="filterUsers()" id="admin-user-status">
+              <option value="">Todos</option><option value="active">Activos</option><option value="inactive">Inactivos</option>
+            </select>
+          </div>
+          <div class="user-row header-row"><span>Usuario</span><span>Nombre completo</span><span>Área</span><span>Estado</span><span>Acciones</span></div>
+          <div id="users-list"></div>
+        </div>
+      </div>
+
+      <!-- Tab Materiales -->
+      <div id="admin-tab-materiales" class="admin-tab">
+        <div class="card" style="margin-bottom:1.4rem">
+          <div class="section-label">➕ Agregar material</div>
+          <div class="form-grid">
+            <div class="form-group"><label>Código *</label><input type="text" id="new-code" placeholder="Ej: HI-008"></div>
+            <div class="form-group"><label>Nombre *</label><input type="text" id="new-name" placeholder="Descripción"></div>
+            <div class="form-group"><label>Categoría *</label>
+              <select id="new-cat"><option value="">Seleccionar...</option>
+              <option>Electricidad 1er año</option>
+              <option>Electricidad 2do año</option>
+              <option>Electricidad 3er año</option>
+              <option>Soldadura 2do año</option>
+              <option>Soldadura 3er año</option>
+              <option>Torneria 2do año</option>
+              <option>Torneria 3er año</option>
+              <option>Corte y plegado 2do año</option>
+              </select>
+            </div>
+            <div class="form-group"><label>Unidad *</label><input type="text" id="new-unit" placeholder="Ej: Unidad, Metro"></div>
+            <div class="form-group"><label>Precio ($)</label><input type="number" id="new-price" placeholder="0.00" min="0" step="0.01"></div>
+          </div>
+          <button class="btn btn-purple btn-lg" onclick="addMaterial()">➕ Agregar</button>
+        </div>
+        <div class="card">
+          <div class="section-label">📋 Catálogo <span class="badge badge-purple" id="mat-count-badge">0</span></div>
+          <div style="display:flex;gap:9px;margin-bottom:1rem;flex-wrap:wrap">
+            <input class="search-input" type="text" placeholder="🔍 Buscar..." oninput="filterAdminMats()" id="admin-mat-search">
+            <select class="filter-select" onchange="filterAdminMats()" id="admin-mat-cat">
+              <option value="">Todas las categorías</option>
+              <option>Electricidad 1er año</option>
+              <option>Electricidad 2do año</option>
+              <option>Electricidad 3er año</option>
+              <option>Soldadura 2do año</option>
+              <option>Soldadura 3er año</option>
+              <option>Torneria 2do año</option>
+              <option>Torneria 3er año</option>
+              <option>Corte y plegado 2do año</option>
+            </select>
+          </div>
+          <div id="admin-mats-list"></div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- MODAL: Detalle pedido -->
+<div class="modal-bg" id="modal-order">
+  <div class="modal">
+    <div class="modal-title" id="modal-order-title">Detalle del pedido</div>
+    <div id="modal-order-body"></div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('modal-order')">Cerrar</button>
+      <button class="btn btn-success" id="modal-export-btn">📥 Exportar Excel</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: Editar material -->
+<div class="modal-bg" id="modal-edit-mat">
+  <div class="modal">
+    <div class="modal-title">✏️ Editar material</div>
+    <input type="hidden" id="edit-mat-id">
+    <div class="form-grid">
+      <div class="form-group"><label>Código</label><input type="text" id="edit-code"></div>
+      <div class="form-group"><label>Nombre</label><input type="text" id="edit-name"></div>
+      <div class="form-group"><label>Categoría</label>
+        <select id="edit-cat">
+              <option>Electricidad 1er año</option>
+              <option>Electricidad 2do año</option>
+              <option>Electricidad 3er año</option>
+              <option>Soldadura 2do año</option>
+              <option>Soldadura 3er año</option>
+              <option>Torneria 2do año</option>
+              <option>Torneria 3er año</option>
+              <option>Corte y plegado 2do año</option>
+        </select>
+      </div>
+      <div class="form-group"><label>Unidad</label><input type="text" id="edit-unit"></div>
+      <div class="form-group"><label>Precio ($)</label><input type="number" id="edit-price" min="0" step="0.01"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('modal-edit-mat')">Cancelar</button>
+      <button class="btn btn-purple" onclick="saveEditMaterial()">💾 Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: Editar usuario -->
+<div class="modal-bg" id="modal-edit-user">
+  <div class="modal">
+    <div class="modal-title">✏️ Editar usuario</div>
+    <input type="hidden" id="edit-user-id">
+    <div class="form-grid">
+      <div class="form-group"><label>Nombre</label><input type="text" id="edit-user-nombre"></div>
+      <div class="form-group"><label>Apellido</label><input type="text" id="edit-user-apellido"></div>
+      <div class="form-group full"><label>Usuario (nombre.apellido)</label><input type="text" id="edit-user-username" readonly style="opacity:.6;cursor:not-allowed"></div>
+      <div class="form-group"><label>Área</label><input type="text" id="edit-user-area"></div>
+      <div class="form-group"><label>Nueva contraseña <span style="font-size:.7rem;color:var(--dim);text-transform:none">(dejar vacío para no cambiar)</span></label><input type="password" id="edit-user-pass" placeholder="Nueva contraseña"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('modal-edit-user')">Cancelar</button>
+      <button class="btn btn-purple" onclick="saveEditUser()">💾 Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div class="toast" id="toast">
+  <div class="toast-title" id="toast-title"></div>
+  <div id="toast-msg"></div>
+</div>
+
+<script>
+// ═══════════════════ FIREBASE FIRESTORE ═══════════════════
+const firebaseConfig = {
+  apiKey: "AIzaSyAUWpMf64-sj2GmSzzzO482tgB8v3Xq_co",
+  authDomain: "pedidos-de-materiales-6d0bf.firebaseapp.com",
+  projectId: "pedidos-de-materiales-6d0bf",
+  storageBucket: "pedidos-de-materiales-6d0bf.firebasestorage.app",
+  messagingSenderId: "1001170445781",
+  appId: "1:1001170445781:web:86d1e2f78d5741bf66c95c"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+
+// Guardar colección completa como un solo documento JSON
+async function dbSave() {
+  try {
+    await db.collection('matflow').doc('users').set({ data: JSON.stringify(USERS), nextId: nextUserId });
+    await db.collection('matflow').doc('materials').set({ data: JSON.stringify(MATERIALS), nextId: nextMatId });
+    await db.collection('matflow').doc('orders').set({ data: JSON.stringify(orders) });
+  } catch(e) { console.warn('Firebase save error:', e); }
+}
+
+async function dbLoad() {
+  try {
+    const uSnap = await db.collection('matflow').doc('users').get();
+    const mSnap = await db.collection('matflow').doc('materials').get();
+    const oSnap = await db.collection('matflow').doc('orders').get();
+    USERS      = uSnap.exists ? JSON.parse(uSnap.data().data)     : [];
+    nextUserId = uSnap.exists ? (uSnap.data().nextId || 1)        : 1;
+    MATERIALS  = mSnap.exists ? JSON.parse(mSnap.data().data)     : DEFAULT_MATERIALS;
+    nextMatId  = mSnap.exists ? (mSnap.data().nextId || 33)       : 33;
+    orders     = oSnap.exists ? JSON.parse(oSnap.data().data)     : [];
+  } catch(e) {
+    console.warn('Firebase load error:', e);
+    USERS=[]; MATERIALS=DEFAULT_MATERIALS; orders=[]; nextUserId=1; nextMatId=33;
+  }
+}
+
+const DEFAULT_MATERIALS = [
+  {id:1,  code:'HI-001', name:'Hierro redondo 6mm x 12m',      category:'Electricidad 1er año',               unit:'Barra',        price:0},
+  {id:2,  code:'HI-002', name:'Hierro redondo 8mm x 12m',      category:'Electricidad 1er año',               unit:'Barra',        price:0},
+  {id:3,  code:'HI-003', name:'Hierro redondo 10mm x 12m',     category:'Electricidad 1er año',               unit:'Barra',        price:0},
+  {id:4,  code:'HI-004', name:'Hierro redondo 12mm x 12m',     category:'Electricidad 1er año',               unit:'Barra',        price:0},
+  {id:5,  code:'HI-005', name:'Hierro ángulo 30x30x3mm',       category:'Electricidad 1er año',               unit:'Barra 6m',     price:0},
+  {id:6,  code:'HI-006', name:'Hierro perfil C 100x50mm',      category:'Electricidad 1er año',               unit:'Barra 6m',     price:0},
+  {id:7,  code:'HI-007', name:'Hierro tubular cuadrado 40x40', category:'Electricidad 1er año',               unit:'Barra 6m',     price:0},
+  {id:8,  code:'EL-001', name:'Cable unipolar 1.5mm²',         category:'Electricidad 1er año', unit:'Metro',        price:0},
+  {id:9,  code:'EL-002', name:'Cable unipolar 2.5mm²',         category:'Electricidad 1er año', unit:'Metro',        price:0},
+  {id:10, code:'EL-003', name:'Cable unipolar 4mm²',           category:'Electricidad 1er año', unit:'Metro',        price:0},
+  {id:11, code:'EL-004', name:'Disyuntor termomagnético 16A',  category:'Electricidad 1er año', unit:'Unidad',       price:0},
+  {id:12, code:'EL-005', name:'Disyuntor termomagnético 32A',  category:'Electricidad 1er año', unit:'Unidad',       price:0},
+  {id:13, code:'EL-006', name:'Tomacorriente 2P+T 10A',        category:'Electricidad 1er año', unit:'Unidad',       price:0},
+  {id:14, code:'EL-007', name:'Tubo LED 18W',                  category:'Electricidad 1er año', unit:'Unidad',       price:0},
+  {id:15, code:'EL-008', name:'Cañería conduit 3/4"',          category:'Electricidad 1er año', unit:'Tramo 3m',     price:0},
+  {id:16, code:'CH-001', name:'Chapa galvanizada N°18 1x2m',   category:'Electricidad 1er año',                unit:'Unidad',       price:0},
+  {id:17, code:'CH-002', name:'Chapa galvanizada N°20 1x2m',   category:'Electricidad 1er año',                unit:'Unidad',       price:0},
+  {id:18, code:'CH-003', name:'Chapa lisa negra 2mm 1x2m',     category:'Electricidad 1er año',                unit:'Unidad',       price:0},
+  {id:19, code:'CH-004', name:'Chapa acanalada N°25 1m',       category:'Electricidad 1er año',                unit:'Metro lineal', price:0},
+  {id:20, code:'CH-005', name:'Chapa perforada 1x2m',          category:'Electricidad 1er año',                unit:'Unidad',       price:0},
+  {id:21, code:'HM-001', name:'Martillo de carpintero 500g',   category:'Electricidad 1er año', unit:'Unidad',       price:0},
+  {id:22, code:'HM-002', name:'Destornillador plano 6"',       category:'Electricidad 1er año', unit:'Unidad',       price:0},
+  {id:23, code:'HM-003', name:'Destornillador Phillips 6"',    category:'Electricidad 1er año', unit:'Unidad',       price:0},
+  {id:24, code:'HM-004', name:'Llave inglesa 12"',             category:'Electricidad 1er año', unit:'Unidad',       price:0},
+  {id:25, code:'HM-005', name:'Alicate universal 8"',          category:'Electricidad 1er año', unit:'Unidad',       price:0},
+  {id:26, code:'HM-006', name:'Sierra manual 12"',             category:'Electricidad 1er año', unit:'Unidad',       price:0},
+  {id:27, code:'HM-007', name:'Cinta métrica 5m',              category:'Electricidad 1er año', unit:'Unidad',       price:0},
+  {id:28, code:'OT-001', name:'Tornillos galvanizados 4x40',   category:'Electricidad 1er año',                 unit:'Caja x100',    price:0},
+  {id:29, code:'OT-002', name:'Cemento Portland 50kg',         category:'Electricidad 1er año',                 unit:'Bolsa',        price:0},
+  {id:30, code:'OT-003', name:'Cinta teflón',                  category:'Electricidad 1er año',                 unit:'Rollo',        price:0},
+  {id:31, code:'OT-004', name:'Disco de corte 115mm',          category:'Electricidad 1er año',                 unit:'Unidad',       price:0},
+  {id:32, code:'OT-005', name:'Lija al agua 120',              category:'Electricidad 1er año',                 unit:'Hoja',         price:0},
+];
+
+
+// ═══════════════════ DATA ═══════════════════
+const ADMIN = { username:'admin', pass:'admin123', role:'admin', nombre:'Admin', apellido:'Sistema' };
+
+let USERS = [];
+let nextUserId = 1;
+let currentUser = null;
+let MATERIALS = [];
+let nextMatId = 33;
+let cart = {};
+let extraItems = [];
+let orders = [];
+
+// Inicializar app cargando datos de Firebase
+async function initApp() {
+  // Mostrar loader
+  document.getElementById('screen-login').classList.remove('active');
+  document.getElementById('screen-loading').classList.add('active');
+  await dbLoad();
+  document.getElementById('screen-loading').classList.remove('active');
+  document.getElementById('screen-login').classList.add('active');
+  populateUserSelect();
+  selectRole('usuario'); // inicializar estado visual del selector de rol
+}
+initApp();
+
+// ═══════════════════ SCREEN / AUTH TAB ═══════════════════
+function populateUserSelect() {
+  const sel = document.getElementById('login-user');
+  if (!sel) return;
+  const activeUsers = USERS.filter(u => u.status === 'active');
+  // Mantener opción por defecto
+  sel.innerHTML = '<option value="">— Seleccioná un usuario —</option>';
+  activeUsers.forEach(u => {
+    const opt = document.createElement('option');
+    opt.value = u.username;
+    opt.textContent = u.nombre + ' ' + u.apellido + ' (' + u.username + ')';
+    sel.appendChild(opt);
+  });
+}
+
+
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+
+function switchAuthTab(tab) {
+  document.getElementById('tab-login').classList.toggle('active', tab==='login');
+  document.getElementById('tab-register').classList.toggle('active', tab==='register');
+  document.getElementById('form-login').style.display = tab==='login'?'block':'none';
+  document.getElementById('form-register').style.display = tab==='register'?'block':'none';
+  clearAuthMsgs();
+}
+
+function clearAuthMsgs() {
+  ['login-error','reg-error','reg-ok'].forEach(id=>{const e=document.getElementById(id);e.style.display='none';e.textContent='';});
+}
+
+// ═══════════════════ REGISTER ═══════════════════
+document.getElementById('reg-nombre').addEventListener('input', updateRegUsername);
+document.getElementById('reg-apellido').addEventListener('input', updateRegUsername);
+function updateRegUsername() {
+  const n = document.getElementById('reg-nombre').value.trim().toLowerCase().replace(/\s+/g,'');
+  const a = document.getElementById('reg-apellido').value.trim().toLowerCase().replace(/\s+/g,'');
+  document.getElementById('reg-username').value = n && a ? n+'.'+a : (n||a||'');
+}
+
+function doRegister() {
+  const nombre   = document.getElementById('reg-nombre').value.trim();
+  const apellido = document.getElementById('reg-apellido').value.trim();
+  const username = document.getElementById('reg-username').value.trim();
+  const pass     = document.getElementById('reg-pass').value;
+  const pass2    = document.getElementById('reg-pass2').value;
+  const area     = document.getElementById('reg-area').value.trim();
+  const errEl = document.getElementById('reg-error');
+  const okEl  = document.getElementById('reg-ok');
+  errEl.style.display='none'; okEl.style.display='none';
+
+  if (!nombre||!apellido||!pass) { showAuthErr('reg-error','Completá nombre, apellido y contraseña.'); return; }
+  if (pass.length < 6) { showAuthErr('reg-error','La contraseña debe tener al menos 6 caracteres.'); return; }
+  if (pass !== pass2) { showAuthErr('reg-error','Las contraseñas no coinciden.'); return; }
+  if (USERS.find(u=>u.username===username)) { showAuthErr('reg-error','Ya existe un usuario con ese nombre y apellido.'); return; }
+
+  USERS.push({ id:nextUserId++, username, pass, nombre, apellido, area, role:'usuario', status:'pending' });
+  dbSave();
+  okEl.textContent = `Solicitud enviada. Usuario: ${username}. Esperá la aprobación del administrador.`;
+  okEl.style.display = 'block';
+  ['reg-nombre','reg-apellido','reg-username','reg-pass','reg-pass2','reg-area'].forEach(id=>document.getElementById(id).value='');
+  updateAdminPendingBadge();
+  setTimeout(()=>showScreen('screen-pending'), 2000);
+}
+
+function showAuthErr(id, msg) {
+  const el = document.getElementById(id);
+  el.textContent = msg; el.style.display = 'block';
+}
+
+// ═══════════════════ LOGIN ═══════════════════
+let selectedLoginRole = 'usuario';
+function selectRole(role) {
+  selectedLoginRole = role;
+  document.getElementById('role-user-card').classList.toggle('selected', role==='usuario');
+  document.getElementById('role-admin-card').classList.toggle('selected', role==='admin');
+  // Mostrar campo correcto
+  const isAdmin = role === 'admin';
+  document.getElementById('field-admin-user').style.display = isAdmin ? 'block' : 'none';
+  document.getElementById('field-select-user').style.display = isAdmin ? 'none' : 'block';
+}
+
+function doLogin() {
+  // Detectar rol por el campo visible (más robusto que la variable)
+  const adminFieldVisible = document.getElementById('field-admin-user').style.display !== 'none';
+  const isAdmin = selectedLoginRole === 'admin' || adminFieldVisible;
+  const username = isAdmin
+    ? document.getElementById('login-user-admin').value.trim()
+    : document.getElementById('login-user').value.trim();
+  const pass  = document.getElementById('login-pass').value;
+  const errEl = document.getElementById('login-error');
+  errEl.style.display = 'none';
+
+  if (isAdmin) {
+    if (username === ADMIN.username && pass === ADMIN.pass) {
+      currentUser = ADMIN;
+      launchApp();
+    } else {
+      showAuthErr('login-error', 'Usuario o contraseña de administrador incorrectos. Usuario: admin / Clave: admin123');
+    }
+    return;
+  }
+
+  const user = USERS.find(u => u.username === username && u.pass === pass && u.role === 'usuario');
+  if (!user) { showAuthErr('login-error', 'Usuario o contraseña incorrectos.'); return; }
+  if (user.status === 'pending') { showAuthErr('login-error', 'Tu cuenta está pendiente de aprobación.'); return; }
+  if (user.status === 'inactive') { showAuthErr('login-error', 'Tu cuenta está desactivada. Contactá al administrador.'); return; }
+  currentUser = user;
+  launchApp();
+}
+
+// ═══════════════════ APP LAUNCH / LOGOUT ═══════════════════
+function launchApp() {
+  document.getElementById('screen-login').classList.remove('active');
+  document.getElementById('app').style.display = 'block';
+  const isAdmin = currentUser.role === 'admin';
+  const pill = document.getElementById('role-pill');
+  pill.className = 'role-pill '+(isAdmin?'admin':'user');
+  pill.textContent = (isAdmin?'⚙️ Administrador':'👷 '+currentUser.nombre+' '+currentUser.apellido);
+  buildNav();
+  if (isAdmin) { initAdminApp(); showPage('admin'); }
+  else { initUserApp(); showPage('catalogo'); }
+}
+
+function logout() {
+  currentUser = null; cart = {};
+  document.getElementById('app').style.display = 'none';
+  document.getElementById('login-pass').value = '';
+  document.getElementById('login-user-admin').value = '';
+  populateUserSelect();
+  showScreen('screen-login');
+  switchAuthTab('login');
+}
+
+// ═══════════════════ NAV ═══════════════════
+function buildNav() {
+  const nav = document.getElementById('main-nav');
+  if (currentUser.role === 'usuario') {
+    nav.innerHTML = `
+      <button class="nav-btn" data-page="catalogo" onclick="showPage('catalogo')">📦 Catálogo</button>
+      <button class="nav-btn" data-page="solicitud" onclick="showPage('solicitud')">📝 Solicitud</button>
+      <button class="nav-btn" data-page="mis-pedidos" onclick="showPage('mis-pedidos')">🗂 Mis pedidos</button>`;
+  } else {
+    nav.innerHTML = `<button class="nav-btn active" data-page="admin" onclick="showPage('admin')">⚙️ Panel Admin</button>`;
+  }
+}
+
+function showPage(name) {
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.getElementById('page-'+name).classList.add('active');
+  document.querySelectorAll('.nav-btn').forEach(b=>b.classList.toggle('active', b.dataset.page===name));
+  if (name==='solicitud') { prefillSolicitud(); renderCartTable(); renderExtraItems(); }
+  if (name==='mis-pedidos') renderMisPedidos();
+  if (name==='admin') { refreshAdminStats(); renderAdminOrders(); }
+}
+
+// ═══════════════════ USER APP ═══════════════════
+function initUserApp() {
+  populateCategoryFilter();
+  activeCatTab = 'Electricidad 1er año';
+  filterCatalog();
+  updateCartStats();
+}
+
+function prefillSolicitud() {
+  if (currentUser && currentUser.role==='usuario') {
+    document.getElementById('sol-nombre').value = currentUser.nombre;
+    document.getElementById('sol-apellido').value = currentUser.apellido;
+    if (!document.getElementById('sol-area').value)
+      document.getElementById('sol-area').value = currentUser.area||'';
+  }
+}
+
+let activeCatTab = 'Electricidad 1er año';
+
+function selectCatTab(btn, cat) {
+  activeCatTab = cat;
+  document.querySelectorAll('.cat-tab').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  filterCatalog();
+}
+
+function populateCategoryFilter() { /* pestañas fijas - no requiere acción */ }
+
+function fmtPrice(p){return p>0?'$'+Number(p).toLocaleString('es-AR',{minimumFractionDigits:2,maximumFractionDigits:2}):'Sin precio';}
+
+function renderCatalog(mats) {
+  const grid=document.getElementById('materials-grid');
+  if(!mats.length){grid.innerHTML='<div class="empty-state" style="grid-column:1/-1"><div class="empty-icon">🔍</div><div>No se encontraron materiales.</div></div>';return;}
+  grid.innerHTML=mats.map(m=>`
+    <div class="material-card">
+      <div class="mat-cat">${m.category}</div>
+      <div class="mat-name">${m.name}</div>
+      <div class="mat-code">${m.code}</div>
+      <div class="mat-unit">📐 ${m.unit}</div>
+      <div style="margin-bottom:9px;display:flex;align-items:center;justify-content:space-between">
+        <span style="font-size:.79rem;color:var(--muted)">Precio unit.</span>
+        <span style="font-family:'Syne',sans-serif;font-weight:700;font-size:.93rem;color:${m.price>0?'var(--green)':'var(--dim)'}">${fmtPrice(m.price)}</span>
+      </div>
+      <div class="mat-actions">
+        <input class="qty-input" type="number" min="1" value="${cart[m.id]?.qty||1}" id="qty-${m.id}" oninput="updateSubtotal(${m.id})">
+        <button class="btn btn-primary" onclick="addToCart(${m.id})" style="flex:1">${cart[m.id]?'✏️ Actualizar':'+ Agregar'}</button>
+      </div>
+      ${m.price>0?`<div id="subtotal-${m.id}" style="margin-top:5px;font-size:.77rem;color:var(--muted);text-align:right">${cart[m.id]?'Subtotal: <strong style=color:var(--green)>$'+Number(m.price*(cart[m.id]?.qty||1)).toLocaleString('es-AR',{minimumFractionDigits:2})+'</strong>':''}</div>`:''}
+      ${cart[m.id]?`<div class="mat-in-cart">✓ En carrito: ${cart[m.id].qty} ${m.unit}</div>`:''}
+    </div>`).join('');
+}
+
+function updateSubtotal(id){
+  const m=MATERIALS.find(m=>m.id===id);if(!m||!m.price)return;
+  const qty=parseInt(document.getElementById('qty-'+id)?.value)||1;
+  const el=document.getElementById('subtotal-'+id);
+  if(el)el.innerHTML='Subtotal: <strong style="color:var(--green)">$'+Number(m.price*qty).toLocaleString('es-AR',{minimumFractionDigits:2})+'</strong>';
+}
+
+function filterCatalog(){
+  const q=document.getElementById('search-input')?.value.toLowerCase()||'';
+  const mats = MATERIALS.filter(m =>
+    m.category === activeCatTab &&
+    (m.name.toLowerCase().includes(q) || m.code.toLowerCase().includes(q))
+  );
+  renderCatalog(mats);
+}
+
+function addToCart(id){
+  const el=document.getElementById('qty-'+id);
+  const qty=parseInt(el?.value)||1;
+  if(qty<1){showToast('Error','La cantidad debe ser mayor a 0','err');return;}
+  const mat=MATERIALS.find(m=>m.id===id);
+  cart[id]={...mat,qty};
+  updateCartStats();filterCatalog();showToast('Agregado',mat.name+' x'+qty,'ok');updateCartBadge();
+}
+
+function addExtraItem(){
+  const desc = document.getElementById('extra-desc').value.trim();
+  const qty  = parseInt(document.getElementById('extra-qty').value)||1;
+  const unit = document.getElementById('extra-unit').value.trim();
+  const ref  = document.getElementById('extra-ref').value.trim();
+  const obs  = document.getElementById('extra-obs').value.trim();
+  if(!desc){showToast('Campo requerido','Ingresá la descripción del material','err');return;}
+  if(qty<1){showToast('Error','La cantidad debe ser mayor a 0','err');return;}
+  extraItems.push({desc, qty, unit, ref, obs});
+  ['extra-desc','extra-qty','extra-unit','extra-ref','extra-obs'].forEach(id=>document.getElementById(id).value='');
+  renderExtraItems();
+  showToast('Ítem agregado',desc,'ok');
+}
+
+function removeExtraItem(idx){
+  extraItems.splice(idx,1);
+  renderExtraItems();
+}
+
+function renderExtraItems(){
+  const c = document.getElementById('extra-items-container');
+  if(!extraItems.length){
+    c.innerHTML='<div class="empty-state" style="padding:1.2rem"><div class="empty-icon" style="font-size:1.5rem">📝</div><div>No hay ítems extra agregados.</div></div>';
+    return;
+  }
+  c.innerHTML=`<table><thead><tr><th>#</th><th>Descripción</th><th>Referencia / Marca</th><th>Cant.</th><th>Unidad</th><th>Observación</th><th></th></tr></thead>
+  <tbody>${extraItems.map((it,i)=>`<tr>
+    <td style="color:var(--muted)">${i+1}</td>
+    <td><strong>${it.desc}</strong></td>
+    <td style="color:var(--muted)">${it.ref||'—'}</td>
+    <td><strong>${it.qty}</strong></td>
+    <td style="color:var(--muted)">${it.unit||'—'}</td>
+    <td style="color:var(--muted);font-size:.8rem">${it.obs||'—'}</td>
+    <td><button class="btn btn-danger btn-sm" onclick="removeExtraItem(${i})">✕</button></td>
+  </tr>`).join('')}</tbody></table>`;
+}
+function removeFromCart(id){delete cart[id];updateCartStats();filterCatalog();updateCartBadge();renderCartTable();}
+function clearCart(){cart={};extraItems=[];updateCartStats();filterCatalog();updateCartBadge();renderCartTable();renderExtraItems();showToast('Carrito vaciado','','ok');}
+
+function updateCartBadge(){
+  const count=Object.keys(cart).length;
+  const b=document.getElementById('cart-count-badge');
+  b.style.display=count>0?'inline':'none';b.textContent=count;
+  document.getElementById('cart-items-count').textContent=count+' ítem'+(count!==1?'s':'');
+}
+
+function updateCartStats(){
+  document.getElementById('stat-total-mat').textContent=MATERIALS.length;
+  document.getElementById('stat-carrito').textContent=Object.keys(cart).length;
+}
+
+function renderCartTable(){
+  const items=Object.values(cart);
+  const c=document.getElementById('cart-table-container');
+  if(!items.length){c.innerHTML='<div class="empty-state"><div class="empty-icon">🧺</div><div>No hay materiales en el carrito.</div></div>';return;}
+  const hp=items.some(i=>i.price>0);
+  const total=items.reduce((s,i)=>s+(i.price>0?i.price*i.qty:0),0);
+  c.innerHTML=`<table><thead><tr><th>Código</th><th>Material</th><th>Categoría</th><th>Cant.</th><th>Unidad</th>${hp?'<th style="text-align:right">Precio unit.</th><th style="text-align:right">Subtotal</th>':''}<th></th></tr></thead>
+  <tbody>${items.map(i=>`<tr><td><span class="tag">${i.code}</span></td><td>${i.name}</td><td>${i.category}</td><td><strong>${i.qty}</strong></td><td style="color:var(--muted)">${i.unit}</td>
+  ${hp?`<td style="text-align:right;color:var(--muted)">${i.price>0?fmtPrice(i.price):'—'}</td><td style="text-align:right;font-weight:600;color:var(--green)">${i.price>0?'$'+Number(i.price*i.qty).toLocaleString('es-AR',{minimumFractionDigits:2}):'—'}</td>`:''}
+  <td><button class="btn btn-danger btn-sm" onclick="removeFromCart(${i.id})">✕</button></td></tr>`).join('')}</tbody>
+  ${hp&&total>0?`<tfoot><tr><td colspan="${hp?5:5}" style="padding:11px;font-size:.77rem;color:var(--muted)">Total estimado</td>${hp?'<td></td>':''}<td style="padding:11px;text-align:right;font-family:Syne,sans-serif;font-weight:800;font-size:1rem;color:var(--green)">$${Number(total).toLocaleString('es-AR',{minimumFractionDigits:2})}</td><td></td></tr></tfoot>`:''}</table>`;
+}
+
+function submitOrder(){
+  const nombre=document.getElementById('sol-nombre').value.trim();
+  const apellido=document.getElementById('sol-apellido').value.trim();
+  const items=Object.values(cart);
+  if(!nombre||!apellido){showToast('Campos requeridos','Ingresá nombre y apellido','err');return;}
+  if(!items.length && !extraItems.length){showToast('Sin materiales','Agregá al menos un material del catálogo o uno extra','err');return;}
+  const order={
+    id:'PED-'+String(orders.length+1).padStart(4,'0'),
+    nombre,apellido,userId:currentUser.id||null,
+    area:document.getElementById('sol-area').value.trim(),
+    fecha:document.getElementById('sol-fecha').value,
+    obs:document.getElementById('sol-obs').value.trim(),
+    items:[...items],
+    extraItems:[...extraItems],
+    createdAt:new Date().toLocaleString('es-AR'),
+    status:'Pendiente'
+  };
+  orders.push(order);
+  dbSave();
+  exportToExcel(order);
+  cart={}; extraItems=[];
+  ['sol-area','sol-fecha','sol-obs'].forEach(id=>document.getElementById(id).value='');
+  filterCatalog();updateCartBadge();renderCartTable();renderExtraItems();
+  showToast('✅ Pedido generado',order.id+' — Excel exportado','ok');
+  showPage('mis-pedidos');
+}
+
+function renderMisPedidos(){
+  const c=document.getElementById('mis-pedidos-container');
+  const myOrders=[...orders].reverse().filter(o=>o.userId===currentUser.id||(o.nombre===currentUser.nombre&&o.apellido===currentUser.apellido));
+  if(!myOrders.length){c.innerHTML='<div class="empty-state card"><div class="empty-icon">📭</div><div>Todavía no realizaste pedidos.</div></div>';return;}
+  c.innerHTML=myOrders.map(o=>`
+    <div class="history-item">
+      <div class="history-meta">
+        <div class="history-id">${o.id}</div>
+        <div class="history-info">📦 ${o.items.length} ítems &nbsp;|&nbsp; 🕐 ${o.createdAt}${o.area?' &nbsp;|&nbsp; '+o.area:''}</div>
+      </div>
+      <span class="status status-${stClass(o.status)}">${stIcon(o.status)} ${o.status}</span>
+      <div class="history-actions">
+        <button class="btn btn-outline btn-sm" onclick="openOrderModal('${o.id}')">Ver detalle</button>
+        <button class="btn btn-success btn-sm" onclick="reExport('${o.id}')">📥 Excel</button>
+      </div>
+    </div>`).join('');
+}
+
+// ═══════════════════ ADMIN APP ═══════════════════
+function initAdminApp(){ refreshAdminStats(); renderAdminOrders(); renderAdminUsers(); renderAdminMats(); }
+
+function refreshAdminStats(){
+  document.getElementById('adm-total').textContent=orders.length;
+  document.getElementById('adm-pending').textContent=orders.filter(o=>o.status==='Pendiente').length;
+  document.getElementById('adm-approved').textContent=orders.filter(o=>o.status==='Aprobado').length;
+  document.getElementById('adm-completed').textContent=orders.filter(o=>o.status==='Completado').length;
+  document.getElementById('adm-users').textContent=USERS.filter(u=>u.status==='active').length;
+  document.getElementById('adm-mats').textContent=MATERIALS.length;
+  const mb=document.getElementById('mat-count-badge');if(mb)mb.textContent=MATERIALS.length;
+  updateAdminPendingBadge();
+}
+
+function updateAdminPendingBadge(){
+  const pending=USERS.filter(u=>u.status==='pending').length;
+  const pb=document.getElementById('pending-count-badge');if(pb)pb.textContent=pending;
+  const ub=document.getElementById('users-count-badge');if(ub)ub.textContent=USERS.filter(u=>u.status!=='pending').length;
+  const tabBtn=document.getElementById('tab-btn-usuarios');
+  if(tabBtn){
+    tabBtn.innerHTML='👥 Usuarios'+(pending>0?`<span class="notif-dot"></span>`:'');
+  }
+}
+
+function showAdminTab(tab,btn){
+  document.querySelectorAll('.admin-tab').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById('admin-tab-'+tab).classList.add('active');
+  btn.classList.add('active');
+  if(tab==='materiales')renderAdminMats();
+  if(tab==='pedidos')renderAdminOrders();
+  if(tab==='usuarios')renderAdminUsers();
+}
+
+// ── ADMIN ORDERS ──
+function renderAdminOrders(filtered){
+  const list=filtered??[...orders].reverse();
+  const c=document.getElementById('admin-orders-list');
+  if(!list.length){c.innerHTML='<div class="empty-state"><div class="empty-icon">📭</div><div>No hay pedidos.</div></div>';return;}
+  c.innerHTML=list.map(o=>`
+    <div class="history-item">
+      <div class="history-meta">
+        <div class="history-id">${o.id}</div>
+        <div class="history-info">👤 ${o.nombre} ${o.apellido}${o.area?' · '+o.area:''} &nbsp;|&nbsp; 📦 ${o.items.length} ítems &nbsp;|&nbsp; 🕐 ${o.createdAt}</div>
+      </div>
+      <span class="status status-${stClass(o.status)}">${stIcon(o.status)} ${o.status}</span>
+      <div class="history-actions">
+        <select class="filter-select" style="padding:5px 9px;font-size:.79rem" onchange="changeOrderStatus('${o.id}',this.value)">
+          <option ${o.status==='Pendiente'?'selected':''}>Pendiente</option>
+          <option ${o.status==='Aprobado'?'selected':''}>Aprobado</option>
+          <option ${o.status==='Completado'?'selected':''}>Completado</option>
+          <option ${o.status==='Rechazado'?'selected':''}>Rechazado</option>
+        </select>
+        <button class="btn btn-outline btn-sm" onclick="openOrderModal('${o.id}')">Ver</button>
+        <button class="btn btn-success btn-sm" onclick="reExport('${o.id}')">📥</button>
+      </div>
+    </div>`).join('');
+}
+
+function filterOrders(){
+  const q=document.getElementById('admin-search-orders').value.toLowerCase();
+  const st=document.getElementById('admin-filter-status').value;
+  renderAdminOrders([...orders].reverse().filter(o=>(o.id.toLowerCase().includes(q)||o.nombre.toLowerCase().includes(q)||o.apellido.toLowerCase().includes(q))&&(st===''||o.status===st)));
+}
+
+function changeOrderStatus(id,s){
+  const o=orders.find(o=>o.id===id);if(o){o.status=s;dbSave();refreshAdminStats();renderMisPedidos();showToast('Estado actualizado',id+' → '+s,'ok');}
+}
+
+function exportAllOrders(){
+  if(!orders.length){showToast('Sin pedidos','No hay pedidos para exportar','err');return;}
+  const wb=XLSX.utils.book_new();
+  const rows=[['N° Pedido','Solicitante','Apellido','Área','Fecha requerida','Estado','Ítems','Fecha creación']];
+  orders.forEach(o=>rows.push([o.id,o.nombre,o.apellido,o.area||'',o.fecha||'',o.status,o.items.length,o.createdAt]));
+  const ws=XLSX.utils.aoa_to_sheet(rows);ws['!cols']=[{wch:12},{wch:16},{wch:16},{wch:16},{wch:16},{wch:14},{wch:8},{wch:20}];
+  XLSX.utils.book_append_sheet(wb,ws,'Resumen');
+  orders.forEach(o=>{
+    const r=[['Código','Material','Categoría','Cantidad','Unidad','Precio Unit.','Subtotal'],...o.items.map(i=>[i.code,i.name,i.category,i.qty,i.unit,i.price>0?i.price:'',i.price>0?i.price*i.qty:''])];
+    const ws2=XLSX.utils.aoa_to_sheet(r);ws2['!cols']=[{wch:10},{wch:35},{wch:18},{wch:10},{wch:14},{wch:14},{wch:14}];
+    XLSX.utils.book_append_sheet(wb,ws2,o.id);
+  });
+  XLSX.writeFile(wb,'MatFlow_Todos_los_Pedidos.xlsx');
+  showToast('Exportado',orders.length+' pedidos','ok');
+}
+
+// ── ADMIN USERS ──
+function renderAdminUsers(filtered){
+  const pending=USERS.filter(u=>u.status==='pending');
+  const pc=document.getElementById('pending-users-list');
+  if(!pending.length){
+    pc.innerHTML='<div class="empty-state" style="padding:1.4rem"><div>No hay solicitudes pendientes. ✅</div></div>';
+  } else {
+    pc.innerHTML=pending.map(u=>`
+      <div class="history-item" style="background:var(--yb);border-color:rgba(255,179,71,.25)">
+        <div class="history-meta">
+          <div class="history-id">👤 ${u.nombre} ${u.apellido}</div>
+          <div class="history-info">Usuario: <strong>${u.username}</strong>${u.area?' &nbsp;|&nbsp; Área: '+u.area:''}</div>
+        </div>
+        <div class="history-actions">
+          <button class="btn btn-green btn-sm" onclick="approveUser(${u.id})">✅ Aprobar</button>
+          <button class="btn btn-danger btn-sm" onclick="rejectUser(${u.id})">✕ Rechazar</button>
+        </div>
+      </div>`).join('');
+  }
+
+  const q = document.getElementById('admin-user-search')?.value.toLowerCase()||'';
+  const sf = document.getElementById('admin-user-status')?.value||'';
+  const list = filtered ?? USERS.filter(u=>u.status!=='pending').filter(u=>
+    (u.username.includes(q)||u.nombre.toLowerCase().includes(q)||u.apellido.toLowerCase().includes(q)) &&
+    (sf===''||u.status===sf));
+  const c=document.getElementById('users-list');
+  if(!list.length){c.innerHTML='<div class="empty-state" style="padding:1.5rem"><div>No hay usuarios registrados.</div></div>';return;}
+  c.innerHTML=list.map(u=>`
+    <div class="user-row">
+      <span style="font-family:'Syne',sans-serif;font-weight:600;font-size:.83rem">${u.username}</span>
+      <span>${u.nombre} ${u.apellido}</span>
+      <span style="color:var(--muted);font-size:.8rem">${u.area||'—'}</span>
+      <span><span class="status status-${u.status==='active'?'active':'inactive'}">${u.status==='active'?'✅ Activo':'🔴 Inactivo'}</span></span>
+      <div style="display:flex;gap:6px;flex-wrap:wrap">
+        <button class="btn btn-yellow btn-sm" onclick="openEditUser(${u.id})">✏️</button>
+        <button class="btn ${u.status==='active'?'btn-danger':'btn-green'} btn-sm" onclick="toggleUserStatus(${u.id})">${u.status==='active'?'Desactivar':'Activar'}</button>
+        <button class="btn btn-danger btn-sm" onclick="deleteUser(${u.id})" style="padding:5px 8px">🗑</button>
+      </div>
+    </div>`).join('');
+  updateAdminPendingBadge();
+}
+
+function filterUsers(){ renderAdminUsers(); }
+
+function approveUser(id){
+  const u=USERS.find(u=>u.id===id);if(!u)return;
+  u.status='active';
+  dbSave();
+  populateUserSelect();
+  showToast('Usuario aprobado',u.nombre+' '+u.apellido+' puede ingresar','ok');
+  renderAdminUsers();refreshAdminStats();
+}
+
+function rejectUser(id){
+  const u=USERS.find(u=>u.id===id);if(!u)return;
+  if(!confirm('¿Rechazar la solicitud de '+u.nombre+' '+u.apellido+'? Se eliminará el registro.'))return;
+  USERS=USERS.filter(u=>u.id!==id);
+  dbSave();
+  showToast('Solicitud rechazada',u.nombre+' '+u.apellido,'warn');
+  renderAdminUsers();refreshAdminStats();
+}
+
+function toggleUserStatus(id){
+  const u=USERS.find(u=>u.id===id);if(!u)return;
+  u.status=u.status==='active'?'inactive':'active';
+  dbSave();
+  showToast('Estado cambiado',u.nombre+' → '+(u.status==='active'?'Activo':'Inactivo'),'ok');
+  renderAdminUsers();refreshAdminStats();
+}
+
+function deleteUser(id){
+  const u=USERS.find(u=>u.id===id);if(!u)return;
+  if(!confirm('¿Eliminar al usuario '+u.nombre+' '+u.apellido+'?'))return;
+  USERS=USERS.filter(u=>u.id!==id);
+  dbSave();
+  showToast('Usuario eliminado',u.nombre+' '+u.apellido,'ok');
+  renderAdminUsers();refreshAdminStats();
+}
+
+function openEditUser(id){
+  const u=USERS.find(u=>u.id===id);if(!u)return;
+  document.getElementById('edit-user-id').value=id;
+  document.getElementById('edit-user-nombre').value=u.nombre;
+  document.getElementById('edit-user-apellido').value=u.apellido;
+  document.getElementById('edit-user-username').value=u.username;
+  document.getElementById('edit-user-area').value=u.area||'';
+  document.getElementById('edit-user-pass').value='';
+  const updateUn=()=>{
+    const n=document.getElementById('edit-user-nombre').value.trim().toLowerCase().replace(/\s+/g,'');
+    const a=document.getElementById('edit-user-apellido').value.trim().toLowerCase().replace(/\s+/g,'');
+    document.getElementById('edit-user-username').value=n&&a?n+'.'+a:(n||a||'');
+  };
+  document.getElementById('edit-user-nombre').oninput=updateUn;
+  document.getElementById('edit-user-apellido').oninput=updateUn;
+  document.getElementById('modal-edit-user').classList.add('open');
+}
+
+function saveEditUser(){
+  const id=parseInt(document.getElementById('edit-user-id').value);
+  const u=USERS.find(u=>u.id===id);if(!u)return;
+  const nombre=document.getElementById('edit-user-nombre').value.trim();
+  const apellido=document.getElementById('edit-user-apellido').value.trim();
+  const newUsername=document.getElementById('edit-user-username').value.trim();
+  const area=document.getElementById('edit-user-area').value.trim();
+  const newPass=document.getElementById('edit-user-pass').value;
+  if(!nombre||!apellido){showToast('Error','Nombre y apellido son requeridos','err');return;}
+  if(USERS.find(uu=>uu.username===newUsername&&uu.id!==id)){showToast('Error','Ese usuario ya existe','err');return;}
+  u.nombre=nombre; u.apellido=apellido; u.username=newUsername; u.area=area;
+  if(newPass.length>=6) u.pass=newPass;
+  else if(newPass.length>0&&newPass.length<6){showToast('Error','La contraseña debe tener al menos 6 caracteres','err');return;}
+  dbSave();
+  closeModal('modal-edit-user');
+  showToast('Usuario actualizado',u.nombre+' '+u.apellido,'ok');
+  renderAdminUsers();
+}
+
+// ── ADMIN MATERIALS ──
+function renderAdminMats(filtered){
+  const list=filtered??MATERIALS;
+  const c=document.getElementById('admin-mats-list');
+  if(!list.length){c.innerHTML='<div class="empty-state"><div class="empty-icon">🔍</div><div>No se encontraron materiales.</div></div>';return;}
+  c.innerHTML=`<div class="mat-row header-row"><span>Código</span><span>Nombre</span><span>Categoría</span><span>Unidad</span><span style="text-align:right">Precio</span><span></span><span></span></div>`+
+  list.map(m=>`<div class="mat-row">
+    <span><span class="tag">${m.code}</span></span>
+    <span>${m.name}</span>
+    <span style="color:var(--muted);font-size:.79rem">${m.category}</span>
+    <span style="color:var(--muted);font-size:.79rem">${m.unit}</span>
+    <span style="text-align:right;font-family:'Syne',sans-serif;font-weight:700;font-size:.87rem;color:${m.price>0?'var(--green)':'var(--dim)'}">${fmtPrice(m.price)}</span>
+    <button class="btn btn-yellow btn-sm" onclick="openEditMat(${m.id})">✏️</button>
+    <button class="btn btn-danger btn-sm" onclick="deleteMat(${m.id})">🗑</button>
+  </div>`).join('');
+  const mb=document.getElementById('mat-count-badge');if(mb)mb.textContent=MATERIALS.length;
+}
+
+function filterAdminMats(){
+  const q=document.getElementById('admin-mat-search').value.toLowerCase();
+  const cat=document.getElementById('admin-mat-cat').value;
+  renderAdminMats(MATERIALS.filter(m=>(m.name.toLowerCase().includes(q)||m.code.toLowerCase().includes(q))&&(cat===''||m.category===cat)));
+}
+
+function addMaterial(){
+  const code=document.getElementById('new-code').value.trim();
+  const name=document.getElementById('new-name').value.trim();
+  const cat=document.getElementById('new-cat').value;
+  const unit=document.getElementById('new-unit').value.trim();
+  const price=parseFloat(document.getElementById('new-price').value)||0;
+  if(!code||!name||!cat||!unit){showToast('Campos requeridos','Completá todos los campos','err');return;}
+  if(MATERIALS.find(m=>m.code===code)){showToast('Código duplicado','Ese código ya existe','err');return;}
+  MATERIALS.push({id:nextMatId++,code,name,category:cat,unit,price});
+  dbSave();
+  ['new-code','new-name','new-unit','new-price'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('new-cat').value='';
+  renderAdminMats();populateCategoryFilter();refreshAdminStats();
+  showToast('Material agregado',name,'ok');
+}
+
+function openEditMat(id){
+  const m=MATERIALS.find(m=>m.id===id);
+  document.getElementById('edit-mat-id').value=id;
+  document.getElementById('edit-code').value=m.code;
+  document.getElementById('edit-name').value=m.name;
+  document.getElementById('edit-cat').value=m.category;
+  document.getElementById('edit-unit').value=m.unit;
+  document.getElementById('edit-price').value=m.price||'';
+  document.getElementById('modal-edit-mat').classList.add('open');
+}
+
+function saveEditMaterial(){
+  const id=parseInt(document.getElementById('edit-mat-id').value);
+  const m=MATERIALS.find(m=>m.id===id);
+  m.code=document.getElementById('edit-code').value.trim();
+  m.name=document.getElementById('edit-name').value.trim();
+  m.category=document.getElementById('edit-cat').value;
+  m.unit=document.getElementById('edit-unit').value.trim();
+  m.price=parseFloat(document.getElementById('edit-price').value)||0;
+  dbSave();
+  closeModal('modal-edit-mat');
+  renderAdminMats();populateCategoryFilter();
+  showToast('Material actualizado',m.name,'ok');
+}
+
+function deleteMat(id){
+  const m=MATERIALS.find(m=>m.id===id);
+  if(!confirm('¿Eliminar "'+m.name+'"?'))return;
+  MATERIALS=MATERIALS.filter(m=>m.id!==id);
+  delete cart[id];
+  dbSave();
+  renderAdminMats();populateCategoryFilter();refreshAdminStats();
+  showToast('Eliminado',m.name,'ok');
+}
+
+// ═══════════════════ EXCEL ═══════════════════
+function exportToExcel(order){
+  const wb=XLSX.utils.book_new();
+  const hp=order.items.some(i=>i.price>0);
+  const total=order.items.reduce((s,i)=>s+(i.price>0?i.price*i.qty:0),0);
+  const extras=order.extraItems||[];
+  const rows=[
+    ['SOLICITUD DE MATERIALES — PEDIDO DE PRECIOS','','','','','','',''],
+    [],
+    ['N° Pedido:',order.id,'','Fecha:',order.createdAt,'','',''],
+    ['Solicitante:',order.nombre+' '+order.apellido,'','Fecha requerida:',order.fecha||'No especificada','','',''],
+    ['Área:',order.area||'—','','Estado:',order.status,'','',''],
+    ['Observaciones:',order.obs||'—','','','','','',''],
+  ];
+  if(order.items.length){
+    rows.push([],['── MATERIALES DEL CATÁLOGO ──','','','','','','','']);
+    rows.push(['#','Código','Descripción','Categoría','Cantidad','Unidad','Precio Unit.','Subtotal']);
+    order.items.forEach((i,idx)=>rows.push([idx+1,i.code,i.name,i.category,i.qty,i.unit,i.price>0?i.price:'',i.price>0?i.price*i.qty:'']));
+    rows.push([],['','','','','','','TOTAL CATÁLOGO:',total>0?total:'']);
+  }
+  if(extras.length){
+    rows.push([],['── MATERIALES FUERA DE CATÁLOGO ──','','','','','','','']);
+    rows.push(['#','Descripción','Referencia / Marca','Cantidad','Unidad','Observación','','']);
+    extras.forEach((it,idx)=>rows.push([idx+1,it.desc,it.ref||'',it.qty,it.unit||'',it.obs||'','','']));
+  }
+  const ws=XLSX.utils.aoa_to_sheet(rows);
+  ws['!cols']=[{wch:4},{wch:10},{wch:35},{wch:18},{wch:10},{wch:22},{wch:16},{wch:16}];
+  XLSX.utils.book_append_sheet(wb,ws,'Pedido completo');
+
+  if(order.items.length){
+    const ws2=XLSX.utils.aoa_to_sheet([
+      ['Código','Descripción','Cantidad','Unidad','Precio Unitario','Subtotal'],
+      ...order.items.map(i=>[i.code,i.name,i.qty,i.unit,i.price>0?i.price:'',i.price>0?i.price*i.qty:'']),
+      [],['','','','','TOTAL',total>0?total:'']
+    ]);
+    ws2['!cols']=[{wch:10},{wch:35},{wch:10},{wch:14},{wch:16},{wch:16}];
+    XLSX.utils.book_append_sheet(wb,ws2,'Catálogo');
+  }
+  if(extras.length){
+    const ws3=XLSX.utils.aoa_to_sheet([
+      ['Descripción','Referencia / Marca','Cantidad','Unidad','Observación'],
+      ...extras.map(it=>[it.desc,it.ref||'',it.qty,it.unit||'',it.obs||''])
+    ]);
+    ws3['!cols']=[{wch:40},{wch:22},{wch:10},{wch:14},{wch:32}];
+    XLSX.utils.book_append_sheet(wb,ws3,'Fuera de catálogo');
+  }
+  XLSX.writeFile(wb,order.id+'_'+order.apellido+'_'+order.nombre+'.xlsx');
+}
+function reExport(id){const o=orders.find(o=>o.id===id);if(o)exportToExcel(o);}
+
+// ═══════════════════ ORDER MODAL ═══════════════════
+function openOrderModal(id){
+  const o=orders.find(o=>o.id===id);
+  const hp=o.items.some(i=>i.price>0);
+  const total=o.items.reduce((s,i)=>s+(i.price>0?i.price*i.qty:0),0);
+  const extras=o.extraItems||[];
+  document.getElementById('modal-order-title').textContent='Detalle — '+o.id;
+  document.getElementById('modal-order-body').innerHTML=`
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1.4rem">
+      <div><div style="font-size:.71rem;color:var(--muted);text-transform:uppercase;margin-bottom:3px">Solicitante</div><strong>${o.nombre} ${o.apellido}</strong></div>
+      <div><div style="font-size:.71rem;color:var(--muted);text-transform:uppercase;margin-bottom:3px">Área</div>${o.area||'—'}</div>
+      <div><div style="font-size:.71rem;color:var(--muted);text-transform:uppercase;margin-bottom:3px">Fecha requerida</div>${o.fecha||'—'}</div>
+      <div><div style="font-size:.71rem;color:var(--muted);text-transform:uppercase;margin-bottom:3px">Estado</div><span class="status status-${stClass(o.status)}">${stIcon(o.status)} ${o.status}</span></div>
+      <div><div style="font-size:.71rem;color:var(--muted);text-transform:uppercase;margin-bottom:3px">Creado</div>${o.createdAt}</div>
+      ${o.obs?`<div style="grid-column:1/-1"><div style="font-size:.71rem;color:var(--muted);text-transform:uppercase;margin-bottom:3px">Observaciones</div>${o.obs}</div>`:''}
+    </div>
+    ${o.items.length?`
+    <div style="font-size:.76rem;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);margin-bottom:.5rem">Materiales del catálogo</div>
+    <table><thead><tr><th>Código</th><th>Material</th><th>Cant.</th><th>Unidad</th>${hp?'<th style="text-align:right">Precio unit.</th><th style="text-align:right">Subtotal</th>':''}</tr></thead>
+    <tbody>${o.items.map(i=>`<tr><td><span class="tag">${i.code}</span></td><td>${i.name}</td><td><strong>${i.qty}</strong></td><td style="color:var(--muted)">${i.unit}</td>
+    ${hp?`<td style="text-align:right;color:var(--muted)">${i.price>0?fmtPrice(i.price):'—'}</td><td style="text-align:right;font-weight:600;color:var(--green)">${i.price>0?'$'+Number(i.price*i.qty).toLocaleString('es-AR',{minimumFractionDigits:2}):'—'}</td>`:''}
+    </tr>`).join('')}</tbody>
+    ${hp&&total>0?`<tfoot><tr><td colspan="4" style="padding:10px;font-size:.77rem;color:var(--muted)">Total estimado</td><td></td><td style="padding:10px;text-align:right;font-family:Syne,sans-serif;font-weight:800;font-size:.98rem;color:var(--green)">$${Number(total).toLocaleString('es-AR',{minimumFractionDigits:2})}</td></tr></tfoot>`:''}</table>`:''}
+    ${extras.length?`
+    <div style="font-size:.76rem;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);margin-top:1.2rem;margin-bottom:.5rem">Materiales fuera de catálogo</div>
+    <table><thead><tr><th>#</th><th>Descripción</th><th>Referencia</th><th>Cant.</th><th>Unidad</th><th>Observación</th></tr></thead>
+    <tbody>${extras.map((it,i)=>`<tr><td style="color:var(--muted)">${i+1}</td><td><strong>${it.desc}</strong></td><td style="color:var(--muted)">${it.ref||'—'}</td><td><strong>${it.qty}</strong></td><td style="color:var(--muted)">${it.unit||'—'}</td><td style="color:var(--muted);font-size:.8rem">${it.obs||'—'}</td></tr>`).join('')}
+    </tbody></table>`:''}`;
+  document.getElementById('modal-export-btn').onclick=()=>reExport(id);
+  document.getElementById('modal-order').classList.add('open');
+}
+
+// ═══════════════════ UTILS ═══════════════════
+function closeModal(id){document.getElementById(id).classList.remove('open');}
+function stClass(s){return {Pendiente:'pending',Aprobado:'approved',Completado:'completed',Rechazado:'rejected'}[s]||'pending';}
+function stIcon(s){return {Pendiente:'🟡',Aprobado:'🔵',Completado:'🟢',Rechazado:'🔴'}[s]||'🟡';}
+
+function showToast(title,msg,type='ok'){
+  const t=document.getElementById('toast');
+  t.className='toast t-'+type;
+  document.getElementById('toast-title').textContent=title;
+  document.getElementById('toast-msg').textContent=msg;
+  t.classList.add('show');
+  clearTimeout(t._timer);
+  t._timer=setTimeout(()=>t.classList.remove('show'),3200);
+}
+
+document.querySelectorAll('.modal-bg').forEach(bg=>bg.addEventListener('click',e=>{if(e.target===bg)bg.classList.remove('open');}));
+
+
+</script>
+</body>
+</html>
